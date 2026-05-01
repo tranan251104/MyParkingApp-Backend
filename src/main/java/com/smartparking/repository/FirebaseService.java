@@ -18,12 +18,12 @@ public class FirebaseService {
     private final DatabaseReference slotRef =
             FirebaseDatabase.getInstance().getReference("slots");
 
-    // 🚗 save vehicle
+    // save vehicle
     public void saveVehicle(Vehicle vehicle) {
         vehicleRef.child(vehicle.getPlate()).setValueAsync(vehicle);
     }
 
-    // 🚗 get vehicle
+    // get vehicle
     public Vehicle getVehicle(String plate) {
         CompletableFuture<Vehicle> future = new CompletableFuture<>();
 
@@ -50,13 +50,13 @@ public class FirebaseService {
             return null;
         }
     }
-    // 🚗 update FULL vehicle (CHECK-IN / CHECK-OUT dùng chung)
+    // update FULL vehicle (CHECK-IN / CHECK-OUT dùng chung)
     public void updateVehicle(Vehicle vehicle) {
         vehicleRef.child(vehicle.getPlate())
                 .setValueAsync(vehicle);
     }
 
-    // 🅿️ update slot
+    // update slot
     public void updateSlot(String slotId, boolean occupied, String plate) {
 
         Map<String, Object> updates = new HashMap<>();
