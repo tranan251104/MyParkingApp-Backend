@@ -1,70 +1,141 @@
 package com.smartparking.repository;
 
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.*;
+import com.smartparking.model.Slot;
 import com.smartparking.model.Vehicle;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
-import java.util.concurrent.CompletableFuture;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 @Service
+@DependsOn("firebaseConfig")
 public class FirebaseService {
 
-    private final DatabaseReference vehicleRef =
-            FirebaseDatabase.getInstance().getReference("vehicles");
+    private final DatabaseReference vehicleRef;
+    private final DatabaseReference slotRef;
+    private final DatabaseReference gateCommandRef;
 
-    private final DatabaseReference slotRef =
-            FirebaseDatabase.getInstance().getReference("slots");
+    public FirebaseService() {
+        FirebaseDatabase database = FirebaseDatabase.getInstance();
 
-    // save vehicle
-    public void saveVehicle(Vehicle vehicle) {
-        vehicleRef.child(vehicle.getPlate()).setValueAsync(vehicle);
+        this.vehicleRef = database.getReference("vehicles");
+        this.slotRef = database.getReference("slots");
+        this.gateCommandRef = database.getReference("gateCommands");
     }
 
-    // get vehicle
+    private String safeKey(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        return value
+                .trim()
+                .toUpperCase()
+                .replace(".", "_")
+                .replace("#", "_")
+                .replace("$", "_")
+                .replace("[", "_")
+                .replace("]", "_")
+                .replace("/", "_")
+                .replace(" ", "");
+    }
+
+    public void saveVehicle(Vehicle vehicle) {
+        String plateKey = safeKey(vehicle.getPlate());
+
+        vehicleRef.child(plateKey)
+                .setValueAsync(vehicle);
+
+        System.out.println("Vehicle saved: " + vehicle.getPlate());
+    }
+
     public Vehicle getVehicle(String plate) {
         CompletableFuture<Vehicle> future = new CompletableFuture<>();
 
-        vehicleRef.child(plate).addListenerForSingleValueEvent(
-                new com.google.firebase.database.ValueEventListener() {
+        String plateKey = safeKey(plate);
 
-                    @Override
-                    public void onDataChange(com.google.firebase.database.DataSnapshot snapshot) {
-                        Vehicle vehicle = snapshot.getValue(Vehicle.class);
-                        future.complete(vehicle);
-                    }
+        vehicleRef.child(plateKey)
+                .addListenerForSingleValueEvent(
+                        new ValueEventListener() {
+                            @Override
+                            public void onDataChange(DataSnapshot snapshot) {
+                                Vehicle vehicle = snapshot.getValue(Vehicle.class);
+                                future.complete(vehicle);
+                            }
 
-                    @Override
-                    public void onCancelled(com.google.firebase.database.DatabaseError error) {
-                        future.completeExceptionally(new RuntimeException(error.getMessage()));
-                    }
-                }
-        );
+                            @Override
+                            public void onCancelled(DatabaseError error) {
+                                future.completeExceptionally(
+                                        new RuntimeException(error.getMessage())
+                                );
+                            }
+                        }
+                );
 
         try {
-            return future.get(); // block đúng cách
+            return future.get(5, TimeUnit.SECONDS);
         } catch (Exception e) {
             e.printStackTrace();
             return null;
         }
     }
-    // update FULL vehicle (CHECK-IN / CHECK-OUT dùng chung)
+
     public void updateVehicle(Vehicle vehicle) {
-        vehicleRef.child(vehicle.getPlate())
+        String plateKey = safeKey(vehicle.getPlate());
+
+        vehicleRef.child(plateKey)
                 .setValueAsync(vehicle);
+
+        System.out.println("Vehicle updated: " + vehicle.getPlate());
     }
 
-    // update slot
-    public void updateSlot(String slotId, boolean occupied, String plate) {
-
+    public void updateSlotFull(Slot slot) {
         Map<String, Object> updates = new HashMap<>();
-        updates.put("occupied", occupied);
-        updates.put("plate", plate);
 
-        slotRef.child(slotId).updateChildrenAsync(updates);
+        updates.put("slotId", slot.getSlotId());
+        updates.put("occupied", slot.isOccupied());
+        updates.put("plate", slot.getPlate());
+        updates.put("reserved", slot.isReserved());
+        updates.put("reservedPlate", slot.getReservedPlate());
+        updates.put("lat", slot.getLat());
+        updates.put("lng", slot.getLng());
 
-        System.out.println("🔥 Slot updated: " + slotId);
+        slotRef.child(slot.getSlotId())
+                .updateChildrenAsync(updates);
+
+        System.out.println("Slot updated: " + slot.getSlotId());
+    }
+
+    public void sendGateCommand(String gateId, String command) {
+        Map<String, Object> data = new HashMap<>();
+
+        data.put("gateId", gateId);
+        data.put("command", command);
+        data.put("timestamp", System.currentTimeMillis());
+
+        gateCommandRef.child(gateId)
+                .setValueAsync(data);
+
+        System.out.println("Gate command: " + gateId + " - " + command);
+    }
+
+    public void openEntryGate() {
+        sendGateCommand("entry", "OPEN");
+    }
+
+    public void closeEntryGate() {
+        sendGateCommand("entry", "CLOSE");
+    }
+
+    public void openExitGate() {
+        sendGateCommand("exit", "OPEN");
+    }
+
+    public void closeExitGate() {
+        sendGateCommand("exit", "CLOSE");
     }
 }

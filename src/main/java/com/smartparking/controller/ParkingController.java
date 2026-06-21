@@ -1,47 +1,84 @@
 package com.smartparking.controller;
 
-import com.smartparking.dto.ApiResponse;
+import com.smartparking.dto.*;
 import com.smartparking.service.ParkingService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/parking")
-@CrossOrigin
+@CrossOrigin(origins = "*")
 public class ParkingController {
 
-    @Autowired
-    private ParkingService parkingService;
+    private final ParkingService parkingService;
 
-    // Check-in
+    public ParkingController(ParkingService parkingService) {
+        this.parkingService = parkingService;
+    }
+
+    @GetMapping("/suggest")
+    public ApiResponse<?> suggest(
+            @RequestParam double lat,
+            @RequestParam double lng
+    ) {
+        return parkingService.suggest(lat, lng);
+    }
+
+    @PostMapping("/reserve")
+    public ApiResponse<?> reserve(@RequestBody ReserveRequest request) {
+        return parkingService.reserve(
+                request.getSlotId(),
+                request.getPlate()
+        );
+    }
+
+    @GetMapping("/reserve")
+    public ApiResponse<?> reserveLegacy(
+            @RequestParam String slotId,
+            @RequestParam String plate
+    ) {
+        return parkingService.reserve(slotId, plate);
+    }
+
+    @PostMapping("/checkin")
+    public ApiResponse<?> checkIn(@RequestBody PlateRequest request) {
+        return parkingService.checkIn(request.getPlate());
+    }
+
     @GetMapping("/checkin")
-    public ApiResponse<?> checkIn(
-            @RequestParam(required = false) String slotId,
-            @RequestParam(required = false) String plate) {
-        return parkingService.checkIn(slotId, plate);
+    public ApiResponse<?> checkInLegacy(@RequestParam String plate) {
+        return parkingService.checkIn(plate);
     }
 
-    // Check-out
+    @PostMapping("/checkout")
+    public ApiResponse<?> checkOut(@RequestBody CheckoutRequest request) {
+        return parkingService.checkOut(request.getSlotId());
+    }
+
     @GetMapping("/checkout")
-    public ApiResponse<?> checkOut(@RequestParam String slotId) {
-        return parkingService.checkOut(slotId); // Truyền slotId vào đây
+    public ApiResponse<?> checkOutLegacy(@RequestParam String slotId) {
+        return parkingService.checkOut(slotId);
     }
 
-    // Thống kê
-    @GetMapping("/slots")
-    public ApiResponse<?> getSlots() {
-        return parkingService.getSlots();
+    @PostMapping("/checkout/by-plate")
+    public ApiResponse<?> checkOutByPlate(@RequestBody PlateRequest request) {
+        return parkingService.checkOutByPlate(request.getPlate());
     }
 
-    // danh sách slot cho Flutter
+    @GetMapping("/checkout/by-plate")
+    public ApiResponse<?> checkOutByPlateLegacy(@RequestParam String plate) {
+        return parkingService.checkOutByPlate(plate);
+    }
+
+    @PostMapping("/slot/sensor")
+    public ApiResponse<?> updateSlotFromSensor(@RequestBody SlotSensorRequest request) {
+        return parkingService.updateSlotFromSensor(
+                request.getSlotId(),
+                request.isOccupied()
+        );
+    }
+
     @GetMapping("/slots/detail")
     public ApiResponse<?> getAllSlots() {
         return parkingService.getAllSlotDetail();
-    }
-
-    // test
-    @GetMapping("/test")
-    public String test() {
-        return "Backend OK";
     }
 }
