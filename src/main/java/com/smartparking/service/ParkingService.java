@@ -333,11 +333,34 @@ public class ParkingService {
                             .filter(slot -> normalizedPlate.equals(slot.getPlate()))
                             .findFirst();
 
-            if (slotOptional.isEmpty()) {
+            if (slotOptional.isPresent()) {
+                slotId = slotOptional.get().getSlotId();
+            }
+        }
+
+        if (slotId == null) {
+            Vehicle vehicle = firebaseService.getVehicle(normalizedPlate);
+
+            if (vehicle == null) {
                 return ApiResponse.fail("Không tìm thấy xe trong bãi");
             }
 
-            slotId = slotOptional.get().getSlotId();
+            slotId = vehicle.getSlotId();
+
+            if (slotId == null || slotId.isBlank()) {
+                return ApiResponse.fail("Xe có trong Firebase nhưng không có slotId");
+            }
+
+            Slot slot = slotMap.get(slotId);
+
+            if (slot == null) {
+                return ApiResponse.fail("Slot của xe không tồn tại");
+            }
+
+            slot.setOccupied(true);
+            slot.setPlate(normalizedPlate);
+
+            vehicleSlotMap.put(normalizedPlate, slotId);
         }
 
         return checkOut(slotId);
